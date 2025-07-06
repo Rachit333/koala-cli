@@ -1,0 +1,7 @@
+{
+  "name": "mytestapp",
+  "type": "next-app",
+  "build": "npm install && npm run build",
+  "start": "npm run start",
+  "port": 0
+}
