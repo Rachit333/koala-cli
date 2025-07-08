@@ -7,6 +7,8 @@ const fsExtra = require("fs-extra");
 const readline = require("readline");
 const { execSync } = require("child_process");
 const chalk = require("chalk");
+const os = require("os");
+const net = require("net");
 
 const SERVER_URL = "http://localhost:1993";
 const [, , command, ...args] = process.argv;
@@ -17,6 +19,28 @@ const symbols = {
   error: chalk.red("[x]"),
   warn: chalk.yellow("[!]"),
 };
+
+const DEFAULT_APPS_DIR = "/opt/koala-apps";
+
+function getGlobalConfigPath() {
+  return path.join(os.homedir(), ".koala-config.json");
+}
+
+function loadGlobalConfig() {
+  const configPath = getGlobalConfigPath();
+  if (!fs.existsSync(configPath)) return {};
+  try {
+    const raw = fs.readFileSync(configPath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveGlobalConfig(data) {
+  const configPath = getGlobalConfigPath();
+  fs.writeFileSync(configPath, JSON.stringify(data, null, 2));
+}
 
 function printHelp() {
   console.log(`
@@ -35,46 +59,46 @@ Usage:
   koala restart <appname>             Restart a running app
   koala logs <appname>                View logs of a deployed app
   koala config                        View global koala settings
-  koala config set <path>            Set global deploy directory path
+  koala config set <path>             Set global deploy directory path
   koala help                          Show this help message
   koala version                       Show current Koala CLI version
 `);
 }
 
-function ensureServerRunning() {
-  const { spawn } = require("child_process");
-  const net = require("net");
-
-  const isPortOpen = (port, callback) => {
+function isPortOpen(port) {
+  return new Promise((resolve) => {
     const socket = new net.Socket();
-    socket.setTimeout(1000);
-    socket.on("connect", () => {
+    socket.setTimeout(800);
+    socket.once("connect", () => {
       socket.destroy();
-      callback(true);
+      resolve(true);
     });
-    socket.on("timeout", () => {
+    socket.once("timeout", () => {
       socket.destroy();
-      callback(false);
+      resolve(false);
     });
-    socket.on("error", () => {
+    socket.once("error", () => {
       socket.destroy();
-      callback(false);
+      resolve(false);
     });
     socket.connect(port, "127.0.0.1");
-  };
-
-  isPortOpen(1993, (open) => {
-    if (!open) {
-      console.log("[+] Starting Koala server...");
-
-      const child = spawn("node", ["server/index.js"], {
-        cwd: __dirname + "/..", 
-        detached: true, 
-        stdio: "ignore", 
-      });
-      child.unref(); 
-    }
   });
+}
+
+async function ensureServerRunning() {
+  const port = 1993;
+  const running = await isPortOpen(port);
+  if (running) return;
+
+  console.log(`${symbols.info} Starting Koala server...`);
+
+  const child = spawn("node", ["server/index.js"], {
+    cwd: __dirname + "/..",
+    detached: true,
+    stdio: "ignore",
+  });
+
+  child.unref();
 }
 
 if (
@@ -138,9 +162,25 @@ function saveGlobalConfig(data) {
 }
 
 async function main() {
-  if (!command || command === "help") {
+
+
+  if (command === "__complete") {
+  const commands = [
+    "init", "run", "deploy", "status", "stop", "restart",
+    "logs", "open", "delete", "update", "inspect",
+    "config", "help", "version", "list"
+  ];
+  const input = args[0] || "";
+  const matches = commands.filter(cmd => cmd.startsWith(input));
+  console.log(matches.join("\n"));
+  process.exit(0);
+}
+
+
+
+  if (!command || command === "--help" || command === "-h") {
     return printHelp();
-  } else if (command === "config") {
+  } else if (command === "--cfg") {
     const config = loadGlobalConfig();
 
     if (args[0] === "set" && args[1]) {
@@ -181,7 +221,7 @@ async function main() {
     console.error(`${symbols.error} ${chalk.red("Invalid config command.")}`);
   }
 
-  if (command === "version") {
+  if (command === "--version" || command === "-v") {
     try {
       const pkg = JSON.parse(
         fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")
@@ -459,10 +499,8 @@ async function main() {
       console.log(`${symbols.success} Stopped app "${name}" on server`);
 
       if (rootFlag) {
-        const deployedPath = path.join(
-          "/home/spidlily/Documents/koala-apps",
-          name
-        );
+        const basePath = loadGlobalConfig().appsDir || DEFAULT_APPS_DIR;
+        const deployedPath = path.join(basePath, name);
 
         if (forceFlag) {
           if (fs.existsSync(deployedPath)) {
@@ -523,6 +561,18 @@ async function main() {
       );
     }
     return;
+  } else if (command === "list") {
+    try {
+      const { data } = await axios.get(`${SERVER_URL}/apps`);
+      if (!data.length) {
+        console.log(`${symbols.warn} No apps currently deployed.`);
+        return;
+      }
+      console.log(chalk.bold("Deployed Apps:\n"));
+      data.forEach((app) => console.log(`- ${chalk.cyan(app)}`));
+    } catch (err) {
+      console.error(`${symbols.error} Failed to fetch list: ${err.message}`);
+    }
   } else {
     console.error(`${symbols.error} Unknown command: "${command}"`);
     printHelp();
