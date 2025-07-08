@@ -33,7 +33,6 @@ app.get("/", (req, res) => {
   res.send("Koala Proxy running");
 });
 
-// --- Start proxy on port 80
 http.createServer(app).listen(80, () => {
   console.log("🌐 Koala proxy running at http://*.localhost");
 });

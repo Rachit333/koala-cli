@@ -67,13 +67,12 @@ function ensureServerRunning() {
     if (!open) {
       console.log("[+] Starting Koala server...");
 
-      // Spawn the server in detached mode so it keeps running
       const child = spawn("node", ["server/index.js"], {
-        cwd: __dirname + "/..", // Set the working directory
-        detached: true, // Keep it running in the background
-        stdio: "ignore", // Ignore input/output streams
+        cwd: __dirname + "/..", 
+        detached: true, 
+        stdio: "ignore", 
       });
-      child.unref(); // Unreference the child process so the CLI can exit independently
+      child.unref(); 
     }
   });
 }
@@ -271,7 +270,7 @@ async function main() {
     );
 
     const global = loadGlobalConfig();
-    const basePath = global.appsDir || "/home/spidlily/Documents/koala-apps";
+    const basePath = global.appsDir || "/home/Documents/koala-apps";
     const dest = path.join(basePath, name);
 
     if (fs.existsSync(dest)) {
