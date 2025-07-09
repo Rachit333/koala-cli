@@ -345,7 +345,7 @@ async function main() {
       });
 
       try {
-        execSync(`chown -R koala:koala "${dest}"`);
+        execSync(`sudo chown -R koala:koala "${dest}"`);
         console.log(`${symbols.info} Fixed permissions for: ${dest}`);
       } catch (err) {
         console.error(`${symbols.warn} Failed to chown files: ${err.message}`);
