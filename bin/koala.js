@@ -87,8 +87,7 @@ function isPortOpen(port) {
 }
 
 async function ensureServerRunning() {
-  const port = 1993;
-  const running = await isPortOpen(port);
+  const running = await isPortOpen(SERVER_PORT);
   if (running) return;
 
   console.log(`${symbols.info} Starting Koala server...`);
