@@ -10,8 +10,8 @@ const chalk = require("chalk");
 const os = require("os");
 const net = require("net");
 const { spawn } = require("child_process");
-
-const SERVER_URL = "http://localhost:1993";
+const SERVER_PORT = process.env.KOALA_PORT || 80;
+const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 const [, , command, ...args] = process.argv;
 
 const symbols = {
@@ -163,21 +163,29 @@ function saveGlobalConfig(data) {
 }
 
 async function main() {
-
-
   if (command === "__complete") {
-  const commands = [
-    "init", "run", "deploy", "status", "stop", "restart",
-    "logs", "open", "delete", "update", "inspect",
-    "config", "help", "version", "list"
-  ];
-  const input = args[0] || "";
-  const matches = commands.filter(cmd => cmd.startsWith(input));
-  console.log(matches.join("\n"));
-  process.exit(0);
-}
-
-
+    const commands = [
+      "init",
+      "run",
+      "deploy",
+      "status",
+      "stop",
+      "restart",
+      "logs",
+      "open",
+      "delete",
+      "update",
+      "inspect",
+      "config",
+      "help",
+      "version",
+      "list",
+    ];
+    const input = args[0] || "";
+    const matches = commands.filter((cmd) => cmd.startsWith(input));
+    console.log(matches.join("\n"));
+    process.exit(0);
+  }
 
   if (!command || command === "--help" || command === "-h") {
     return printHelp();

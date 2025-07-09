@@ -189,7 +189,7 @@ const { registerApp } = require("./proxy");
 const chalk = require("chalk");
 
 const app = express();
-const PORT = 1993;
+const PORT = process.env.PORT || 80;
 const apps = {};
 const REGISTRY_PATH = "/opt/koala-state/registry.json";
 const LOCKFILE = "/tmp/.koala-server.lock";
