@@ -33,8 +33,4 @@ app.get("/", (req, res) => {
   res.send("Koala Proxy running");
 });
 
-http.createServer(app).listen(80, () => {
-  console.log("🌐 Koala proxy running at http://*.localhost");
-});
-
-module.exports = { registerApp, koalaApps };
+module.exports = { registerApp, koalaApps, proxyMiddleware: app };

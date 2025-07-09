@@ -185,7 +185,7 @@ const express = require("express");
 const fs = require("fs-extra");
 const path = require("path");
 const { spawn, execSync } = require("child_process");
-const { registerApp } = require("./proxy");
+const { registerApp, proxyMiddleware } = require("./proxy");
 const chalk = require("chalk");
 
 const app = express();
@@ -243,6 +243,8 @@ function loadAppRegistry() {
 function isPortInUse(port) {
   return Object.values(apps).some(app => app.port === port && app.running);
 }
+
+app.use(proxyMiddleware);
 
 // ---- App launching ----
 function launchApp(meta) {

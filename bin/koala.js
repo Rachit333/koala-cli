@@ -319,7 +319,7 @@ async function main() {
     );
 
     const global = loadGlobalConfig();
-    const basePath = global.appsDir || "/home/Documents/koala-apps";
+    const basePath = loadGlobalConfig().appsDir || DEFAULT_APPS_DIR;
     const dest = path.join(basePath, name);
 
     if (fs.existsSync(dest)) {
