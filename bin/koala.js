@@ -9,6 +9,7 @@ const { execSync } = require("child_process");
 const chalk = require("chalk");
 const os = require("os");
 const net = require("net");
+const { spawn } = require("child_process");
 
 const SERVER_URL = "http://localhost:1993";
 const [, , command, ...args] = process.argv;
