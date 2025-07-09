@@ -340,6 +340,13 @@ async function main() {
 
     try {
       await fsExtra.copy(cwd, dest);
+      try {
+        execSync(`chown -R koala:koala "${dest}"`);
+        console.log(`${symbols.info} Fixed permissions for: ${dest}`);
+      } catch (err) {
+        console.error(`${symbols.warn} Failed to chown files: ${err.message}`);
+      }
+      
       console.log(
         `${symbols.success} Project copied to local server dir: ${dest}`
       );
