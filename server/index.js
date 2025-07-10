@@ -52,7 +52,7 @@
 //     child.stdout.on("data", (data) => {
 //       const line = `[${name}] ${data.toString()}`;
 //       logs.push(line);
-//       if (logs.length > 1000) logs.shift(); 
+//       if (logs.length > 1000) logs.shift();
 //       process.stdout.write(line);
 //     });
 
@@ -180,12 +180,12 @@
 //   console.log(`🧪 Koala server listening at http://localhost:${PORT}`);
 // });
 
-
 const express = require("express");
 const fs = require("fs-extra");
 const path = require("path");
 const { spawn, execSync } = require("child_process");
 const { registerApp, proxyMiddleware } = require("./proxy");
+const net = require("net");
 const chalk = require("chalk");
 
 const app = express();
@@ -206,7 +206,9 @@ app.use(require("cors")());
 
 // Prevent duplicate instance via lockfile
 if (fs.existsSync(LOCKFILE)) {
-  console.error(`${symbols.error} Koala server already running (lockfile exists)`);
+  console.error(
+    `${symbols.error} Koala server already running (lockfile exists)`
+  );
   process.exit(1);
 }
 fs.ensureFileSync(LOCKFILE);
@@ -240,8 +242,26 @@ function loadAppRegistry() {
   }
 }
 
+// function isPortInUse(port) {
+//   return Object.values(apps).some(app => app.port === port && app.running);
+// }
+
 function isPortInUse(port) {
-  return Object.values(apps).some(app => app.port === port && app.running);
+  return new Promise((resolve) => {
+    const tester = net
+      .createServer()
+      .once("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+          resolve(true); // Port is in use
+        } else {
+          resolve(false); // Some other error, treat as not in use
+        }
+      })
+      .once("listening", () => {
+        tester.close(() => resolve(false)); // Port is available
+      })
+      .listen(port);
+  });
 }
 
 app.use(proxyMiddleware);
@@ -249,7 +269,9 @@ app.use(proxyMiddleware);
 // ---- App launching ----
 function launchApp(meta) {
   if (isPortInUse(meta.port)) {
-    console.warn(`${symbols.warn} Port ${meta.port} already in use. Skipping ${meta.name}`);
+    console.warn(
+      `${symbols.warn} Port ${meta.port} already in use. Skipping ${meta.name}`
+    );
     return;
   }
 
@@ -303,19 +325,23 @@ app.post("/deploy", async (req, res) => {
   const configPath = path.join(appPath, ".koala.json");
 
   if (!fs.existsSync(configPath)) {
-    return res.status(400).json({ success: false, message: ".koala.json not found" });
+    return res
+      .status(400)
+      .json({ success: false, message: ".koala.json not found" });
   }
 
   const config = JSON.parse(await fs.readFile(configPath, "utf8"));
 
   if (!config.build || !config.start) {
-    return res.status(400).json({ success: false, message: "Missing build/start in config" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing build/start in config" });
   }
 
-  const port = 3100 + Object.keys(apps).length;
-
-  if (isPortInUse(port)) {
-    return res.status(500).json({ success: false, message: `Port ${port} already in use` });
+  let port = 3100;
+  while (await isPortInUse(port)) {
+    console.log(`${symbols.warn} Port ${port} is in use, trying next...`);
+    port++;
   }
 
   console.log(`${symbols.info} [${name}] Running build...`);
@@ -357,7 +383,9 @@ app.post("/deploy", async (req, res) => {
 app.post("/control/:name/stop", (req, res) => {
   const app = apps[req.params.name];
   if (!app || !app.process) {
-    return res.status(404).json({ error: `App "${req.params.name}" not running.` });
+    return res
+      .status(404)
+      .json({ error: `App "${req.params.name}" not running.` });
   }
   app.process.kill();
   app.running = false;
@@ -368,7 +396,9 @@ app.post("/control/:name/stop", (req, res) => {
 app.post("/control/:name/restart", (req, res) => {
   const app = apps[req.params.name];
   if (!app) {
-    return res.status(404).json({ error: `App "${req.params.name}" not found.` });
+    return res
+      .status(404)
+      .json({ error: `App "${req.params.name}" not found.` });
   }
   if (app.process) app.process.kill();
   launchApp(app);
@@ -396,7 +426,9 @@ app.get("/status", (req, res) => {
     if (appData.running && folderExists && appData.process?.pid) {
       try {
         const pid = appData.process.pid;
-        const output = execSync(`ps -p ${pid} -o %cpu,rss --no-headers`).toString();
+        const output = execSync(
+          `ps -p ${pid} -o %cpu,rss --no-headers`
+        ).toString();
         const [cpuStr, memKb] = output.trim().split(/\s+/);
         cpu = cpuStr + "%";
         memory = (parseInt(memKb, 10) / 1024).toFixed(1) + " MB";
@@ -422,7 +454,9 @@ app.get("/apps", (req, res) => {
 
 // ---- Start server ----
 app.listen(PORT, () => {
-  console.log(`${symbols.success} Koala server listening at http://localhost:${PORT}`);
+  console.log(
+    `${symbols.success} Koala server listening at http://localhost:${PORT}`
+  );
 });
 
 // ---- Cleanup on exit ----

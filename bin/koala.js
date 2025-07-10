@@ -110,50 +110,29 @@ if (
   ensureServerRunning();
 }
 
-// function createKoalaConfig(appPath, name, template, pkg = {}) {
-//   const config = {
-//     name,
-//     type: template,
-//     build: pkg.scripts?.build ? "npm run" : "npm install",
-//     start: pkg.scripts?.start
-//       ? "PORT=$PORT npm start"
-//       : "PORT=$PORT node index.js",
-//     port: 80,
-//     description: pkg.description || "",
-//     version: pkg.version || "1.0.0",
-//     author: pkg.author || "",
-//     license: pkg.license || "MIT",
-//     createdAt: new Date().toISOString(),
-//   };
-//   fs.writeFileSync(
-//     path.join(appPath, ".koala.json"),
-//     JSON.stringify(config, null, 2)
-//   );
-// }
-
 function createKoalaConfig(appPath, name, template, pkg = {}) {
   let buildCommand;
   let startCommand;
 
   switch (template) {
     case "react":
-      buildCommand = "npm install && npm run build";
+      buildCommand = "npm run build";
       startCommand = "PORT=$PORT npm start";
       break;
     case "next":
-      buildCommand = "npm install && npm run build";
+      buildCommand = "npm run build";
       startCommand = "PORT=$PORT npm run start";
       break;
     case "vue":
-      buildCommand = "npm install && npm run build";
+      buildCommand = "npm run build";
       startCommand = "PORT=$PORT npm run dev";
       break;
     case "angular":
-      buildCommand = "npm install && ng build";
+      buildCommand = "ng build";
       startCommand = "PORT=$PORT ng serve --open";
       break;
     case "svelte":
-      buildCommand = "npm install && npm run build";
+      buildCommand = "npm run build";
       startCommand = "PORT=$PORT npm run dev";
       break;
     case "express":
@@ -353,13 +332,18 @@ async function main() {
     }
     return;
   } else if (command === "run") {
-    const cwd = process.cwd();
-    const configPath = path.join(cwd, ".koala.json");
-
-    if (!fs.existsSync(configPath)) {
-      console.error(
-        `${symbols.error} .koala.json not found. Please run "koala init" first.`
-      );
+    if (args.length === 1) {
+      const name = args[0];
+      try {
+        await axios.post(`${SERVER_URL}/control/${name}/restart`);
+        console.log(`${symbols.success} Resumed app "${name}"`);
+      } catch (err) {
+        console.error(
+          `${symbols.error} Failed to resume "${name}": ${
+            err.response?.data?.error || err.message
+          }`
+        );
+      }
       return;
     }
 
@@ -398,8 +382,7 @@ async function main() {
 
     try {
       await fsExtra.copy(cwd, dest, {
-        filter: (src) =>
-          !src.includes("node_modules") && !src.includes(".eslintcache"),
+        filter: (src) => !src.includes(".eslintcache"),
       });
 
       try {
