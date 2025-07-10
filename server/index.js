@@ -5,6 +5,7 @@ const { spawn, execSync } = require("child_process");
 const { registerApp, proxyMiddleware } = require("./proxy");
 const net = require("net");
 const chalk = require("chalk");
+const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const app = express();
 const PORT = process.env.PORT || 80;
