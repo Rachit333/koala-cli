@@ -246,21 +246,23 @@ function loadAppRegistry() {
 //   return Object.values(apps).some(app => app.port === port && app.running);
 // }
 
-function isPortInUse(port) {
+function isPortInUse(port, host = "127.0.0.1") {
   return new Promise((resolve) => {
-    const tester = net
-      .createServer()
-      .once("error", (err) => {
-        if (err.code === "EADDRINUSE") {
-          resolve(true); // Port is in use
-        } else {
-          resolve(false); // Some other error, treat as not in use
-        }
-      })
-      .once("listening", () => {
-        tester.close(() => resolve(false)); // Port is available
-      })
-      .listen(port);
+    const server = net.createServer();
+
+    server.once("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+
+    server.once("listening", () => {
+      server.close(() => resolve(false));
+    });
+
+    server.listen(port, host);
   });
 }
 
