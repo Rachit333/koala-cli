@@ -204,16 +204,27 @@ app.post("/control/:name/stop", (req, res) => {
 });
 
 app.post("/control/:name/restart", async (req, res) => {
-  const app = apps[req.params.name];
-  if (!app) {
+  const existing = apps[req.params.name];
+  if (!existing) {
     return res
       .status(404)
       .json({ error: `App "${req.params.name}" not found.` });
   }
-  if (app.process) app.process.kill();
-  await launchApp(app);
+
+  if (existing.process) existing.process.kill();
+
+  const meta = {
+    name: existing.name,
+    template: existing.template,
+    path: existing.path,
+    port: existing.port,
+    start: existing.start,
+  };
+
+  await launchApp(meta);
   saveAppRegistry();
-  res.json({ success: true, message: `Restarted "${app.name}"` });
+
+  res.json({ success: true, message: `Restarted "${meta.name}"` });
 });
 
 app.get("/control/:name/logs", (req, res) => {
