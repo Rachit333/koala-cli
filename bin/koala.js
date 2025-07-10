@@ -347,6 +347,7 @@ async function main() {
       return;
     }
 
+    const cwd = process.cwd();
     const configPath = path.join(process.cwd(), ".koala.json");
     const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
     const validationError = validateConfig(config);
