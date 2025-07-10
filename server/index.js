@@ -236,16 +236,20 @@ app.post("/control/:name/restart", async (req, res) => {
   if (existing.process) existing.process.kill();
   apps[req.params.name].running = false;
 
-  await wait(200); // Allow port to free up
+  // Wait for port to actually be freed (up to 2s)
+  for (let i = 0; i < 20; i++) {
+    if (!(await isPortInUse(existing.port))) break;
+    await wait(100);
+  }
 
   const portStillInUse = await isPortInUse(existing.port);
   if (portStillInUse) {
     console.warn(
       `${symbols.warn} Port ${existing.port} still in use. Will not restart ${existing.name}`
     );
-    return res
-      .status(500)
-      .json({ error: `Port ${existing.port} still in use. Restart aborted.` });
+    return res.status(500).json({
+      error: `Port ${existing.port} still in use. Restart aborted.`,
+    });
   }
 
   await launchApp(existing);
