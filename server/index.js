@@ -109,15 +109,32 @@ async function launchApp(meta) {
     process.stderr.write(line);
   });
 
+  // Set app as launching, not yet running
   apps[meta.name] = {
     ...meta,
     logs,
     process: child,
-    running: true,
+    running: false,
     startedAt: new Date().toISOString(),
   };
 
   registerApp(meta.name, meta.port);
+
+  // ✅ Wait for port to become available (up to 3s)
+  for (let i = 0; i < 30; i++) {
+    if (await isPortInUse(meta.port)) {
+      apps[meta.name].running = true;
+      return;
+    }
+    await wait(100);
+  }
+
+  // ❌ App failed to start properly
+  console.warn(
+    `${symbols.warn} App ${meta.name} failed to bind to port ${meta.port} in time`
+  );
+  child.kill();
+  apps[meta.name].running = false;
 }
 
 // ---- Restore saved apps ----
