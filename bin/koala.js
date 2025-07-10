@@ -12,6 +12,7 @@ const net = require("net");
 const { spawn } = require("child_process");
 const SERVER_PORT = process.env.KOALA_PORT || 80;
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
+
 const [, , command, ...args] = process.argv;
 
 const symbols = {
@@ -109,14 +110,71 @@ if (
   ensureServerRunning();
 }
 
+// function createKoalaConfig(appPath, name, template, pkg = {}) {
+//   const config = {
+//     name,
+//     type: template,
+//     build: pkg.scripts?.build ? "npm run" : "npm install",
+//     start: pkg.scripts?.start
+//       ? "PORT=$PORT npm start"
+//       : "PORT=$PORT node index.js",
+//     port: 80,
+//     description: pkg.description || "",
+//     version: pkg.version || "1.0.0",
+//     author: pkg.author || "",
+//     license: pkg.license || "MIT",
+//     createdAt: new Date().toISOString(),
+//   };
+//   fs.writeFileSync(
+//     path.join(appPath, ".koala.json"),
+//     JSON.stringify(config, null, 2)
+//   );
+// }
+
 function createKoalaConfig(appPath, name, template, pkg = {}) {
+  let buildCommand;
+  let startCommand;
+
+  switch (template) {
+    case "react":
+      buildCommand = "npm install && npm run build";
+      startCommand = "PORT=$PORT npm start";
+      break;
+    case "next":
+      buildCommand = "npm install && npm run build";
+      startCommand = "PORT=$PORT npm run start";
+      break;
+    case "vue":
+      buildCommand = "npm install && npm run build";
+      startCommand = "PORT=$PORT npm run dev";
+      break;
+    case "angular":
+      buildCommand = "npm install && ng build";
+      startCommand = "PORT=$PORT ng serve --open";
+      break;
+    case "svelte":
+      buildCommand = "npm install && npm run build";
+      startCommand = "PORT=$PORT npm run dev";
+      break;
+    case "express":
+      buildCommand = "npm install";
+      startCommand = pkg.scripts?.start
+        ? "PORT=$PORT npm start"
+        : "PORT=$PORT node index.js";
+      break;
+    default:
+      buildCommand = pkg.scripts?.build ? "npm run build" : "npm install";
+      startCommand = pkg.scripts?.start
+        ? "PORT=$PORT npm start"
+        : "PORT=$PORT node index.js";
+      break;
+  }
+
   const config = {
     name,
     type: template,
-    build: pkg.scripts?.build ? "npm run build" : "npm install",
-    start: pkg.scripts?.start
-      ? "PORT=$PORT npm start"
-      : "PORT=$PORT node index.js",
+    build: buildCommand,
+    start: startCommand,
     port: 0,
     description: pkg.description || "",
     version: pkg.version || "1.0.0",
@@ -124,6 +182,7 @@ function createKoalaConfig(appPath, name, template, pkg = {}) {
     license: pkg.license || "MIT",
     createdAt: new Date().toISOString(),
   };
+
   fs.writeFileSync(
     path.join(appPath, ".koala.json"),
     JSON.stringify(config, null, 2)
@@ -186,9 +245,9 @@ async function main() {
     process.exit(0);
   }
 
-  if (!command || command === "--help" || command === "-h") {
+  if (!command || command === "help" || command === "-h") {
     return printHelp();
-  } else if (command === "--cfg") {
+  } else if (command === "config" || command === "--cfg") {
     const config = loadGlobalConfig();
 
     if (args[0] === "set" && args[1]) {
