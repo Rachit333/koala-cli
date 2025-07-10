@@ -221,6 +221,7 @@ app.post("/control/:name/restart", async (req, res) => {
     start: existing.start,
   };
 
+  await wait(300);
   await launchApp(meta);
   saveAppRegistry();
 
