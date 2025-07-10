@@ -76,10 +76,14 @@ app.use(proxyMiddleware);
 
 // ---- App launching ----
 async function launchApp(meta) {
-  if (await isPortInUse(meta.port)) {
+  const portInUse = await isPortInUse(meta.port);
+  if (portInUse) {
     console.warn(
       `${symbols.warn} Port ${meta.port} already in use. Skipping ${meta.name}`
     );
+    if (apps[meta.name]) {
+      apps[meta.name].running = false;
+    }
     return;
   }
 
@@ -212,20 +216,24 @@ app.post("/control/:name/restart", async (req, res) => {
   }
 
   if (existing.process) existing.process.kill();
+  apps[req.params.name].running = false;
 
-  const meta = {
-    name: existing.name,
-    template: existing.template,
-    path: existing.path,
-    port: existing.port,
-    start: existing.start,
-  };
+  await wait(200); // Allow port to free up
 
-  await wait(300);
-  await launchApp(meta);
+  const portStillInUse = await isPortInUse(existing.port);
+  if (portStillInUse) {
+    console.warn(
+      `${symbols.warn} Port ${existing.port} still in use. Will not restart ${existing.name}`
+    );
+    return res
+      .status(500)
+      .json({ error: `Port ${existing.port} still in use. Restart aborted.` });
+  }
+
+  await launchApp(existing);
   saveAppRegistry();
 
-  res.json({ success: true, message: `Restarted "${meta.name}"` });
+  res.json({ success: true, message: `Restarted "${existing.name}"` });
 });
 
 app.get("/control/:name/logs", (req, res) => {
