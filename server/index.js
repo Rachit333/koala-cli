@@ -236,20 +236,38 @@ app.post("/control/:name/restart", async (req, res) => {
   if (existing.process) existing.process.kill();
   apps[req.params.name].running = false;
 
-  // Wait for port to actually be freed (up to 2s)
+  // Wait up to 2s for port to free, else force-kill anything bound to it
   for (let i = 0; i < 20; i++) {
     if (!(await isPortInUse(existing.port))) break;
     await wait(100);
   }
 
-  const portStillInUse = await isPortInUse(existing.port);
-  if (portStillInUse) {
+  // Final check
+  if (await isPortInUse(existing.port)) {
     console.warn(
-      `${symbols.warn} Port ${existing.port} still in use. Will not restart ${existing.name}`
+      `${symbols.warn} Port ${existing.port} still in use after waiting. Attempting forced kill...`
     );
-    return res.status(500).json({
-      error: `Port ${existing.port} still in use. Restart aborted.`,
-    });
+    try {
+      // Find and kill any process using the port
+      const pid = execSync(`lsof -t -i:${existing.port} -sTCP:LISTEN`)
+        .toString()
+        .trim();
+
+      if (pid) {
+        execSync(`kill -9 ${pid}`);
+        console.log(
+          `${symbols.warn} Force-killed PID ${pid} using port ${existing.port}`
+        );
+        await wait(300); // Wait a bit for port to actually release
+      }
+    } catch (e) {
+      console.error(
+        `${symbols.error} Failed to force-kill port ${existing.port}: ${e.message}`
+      );
+      return res.status(500).json({
+        error: `Port ${existing.port} still in use. Restart aborted.`,
+      });
+    }
   }
 
   await launchApp(existing);
