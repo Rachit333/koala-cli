@@ -45,6 +45,7 @@ function saveAppRegistry() {
       start: data.start,
       running: data.running,
       startedAt: data.startedAt,
+      pid: data.pid || null, // ✅ Persist PID
     };
   }
   fs.ensureDirSync(path.dirname(REGISTRY_PATH));
@@ -115,6 +116,7 @@ async function launchApp(meta) {
     ...meta,
     logs,
     process: child,
+    pid: child.pid, // ✅ Save PID
     running: false,
     startedAt: new Date().toISOString(),
   };
@@ -125,6 +127,7 @@ async function launchApp(meta) {
   for (let i = 0; i < 30; i++) {
     if (await isPortInUse(meta.port)) {
       apps[meta.name].running = true;
+      saveAppRegistry(); // Save registry with PID
       return;
     }
     await wait(100);
@@ -136,6 +139,7 @@ async function launchApp(meta) {
   );
   child.kill();
   apps[meta.name].running = false;
+  saveAppRegistry();
 }
 
 // ---- Restore saved apps ----
@@ -212,17 +216,58 @@ app.post("/deploy", async (req, res) => {
 });
 
 // ---- Control endpoints ----
-app.post("/control/:name/stop", (req, res) => {
+app.post("/control/:name/stop", async (req, res) => {
   const app = apps[req.params.name];
-  if (!app || !app.process) {
+
+  if (!app) {
     return res
       .status(404)
-      .json({ error: `App "${req.params.name}" not running.` });
+      .json({ error: `App "${req.params.name}" not found.` });
   }
-  app.process.kill();
+
+  let killed = false;
+
+  // Try to stop using stored process object
+  if (app.process) {
+    app.process.kill();
+    killed = true;
+  } else {
+    // Fallback: try to kill anything bound to the app's port
+    try {
+      const pid = execSync(`lsof -t -i:${app.port} -sTCP:LISTEN`)
+        .toString()
+        .trim();
+
+      if (pid) {
+        execSync(`kill -9 ${pid}`);
+        console.warn(
+          `${symbols.warn} Force-killed orphan process using port ${app.port} (PID ${pid})`
+        );
+        killed = true;
+      }
+    } catch (err) {
+      console.warn(
+        `${symbols.warn} No PID found for port ${app.port} during stop`
+      );
+    }
+  }
+
   app.running = false;
+  app.process = null;
+  app.pid = null; // ✅ Optional: only needed if you persist pid
   saveAppRegistry();
-  res.json({ success: true, message: `Stopped "${req.params.name}"` });
+
+  if (killed) {
+    return res.json({
+      success: true,
+      message: `Stopped "${req.params.name}"`,
+    });
+  } else {
+    return res.json({
+      success: false,
+      message: `"${req.params.name}" was not running.`,
+    });
+  }
 });
 
 app.post("/control/:name/restart", async (req, res) => {
