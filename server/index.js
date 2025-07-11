@@ -242,7 +242,7 @@ app.post("/control/:name/stop", async (req, res) => {
   if (!killed) {
     try {
       // Try lsof first
-      let pid = execSync(`lsof -t -i:${app.port} -sTCP:LISTEN || true`)
+      let pid = execSync(`sudo lsof -t -i:${app.port} -sTCP:LISTEN || true`)
         .toString()
         .trim();
 
@@ -305,7 +305,7 @@ app.post("/control/:name/restart", async (req, res) => {
     );
     try {
       // Find and kill any process using the port
-      const pid = execSync(`lsof -t -i:${existing.port} -sTCP:LISTEN`)
+      const pid = execSync(`sudo lsof -t -i:${existing.port} -sTCP:LISTEN`)
         .toString()
         .trim();
 
