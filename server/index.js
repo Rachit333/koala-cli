@@ -93,6 +93,7 @@ async function launchApp(meta) {
     cwd: meta.path,
     shell: true,
     env: { ...process.env, PORT: meta.port },
+    detached: false,
   });
 
   const logs = [];
@@ -217,56 +218,66 @@ app.post("/deploy", async (req, res) => {
 
 // ---- Control endpoints ----
 app.post("/control/:name/stop", async (req, res) => {
-  const app = apps[req.params.name];
+  const name = req.params.name;
+  const app = apps[name];
 
   if (!app) {
-    return res
-      .status(404)
-      .json({ error: `App "${req.params.name}" not found.` });
+    return res.status(404).json({ error: `App "${name}" not found.` });
   }
 
   let killed = false;
 
-  // Try to stop using stored process object
+  // Try stopping with known process handle
   if (app.process) {
-    app.process.kill();
-    killed = true;
-  } else {
-    // Fallback: try to kill anything bound to the app's port
     try {
-      const pid = execSync(`lsof -t -i:${app.port} -sTCP:LISTEN`)
+      app.process.kill();
+      console.log(`${symbols.success} Killed child process for "${name}"`);
+      killed = true;
+    } catch (e) {
+      console.warn(`${symbols.warn} Failed to kill app process: ${e.message}`);
+    }
+  }
+
+  // Fallback: try to kill any process bound to the app's port
+  if (!killed) {
+    try {
+      // Try lsof first
+      let pid = execSync(`lsof -t -i:${app.port} -sTCP:LISTEN || true`)
         .toString()
         .trim();
+
+      // Fallback to grep for 'next start'
+      if (!pid && app.path) {
+        const grepCmd = `ps aux | grep 'next start' | grep '${app.path}' | grep -v grep | awk '{print $2}'`;
+        pid = execSync(grepCmd).toString().trim();
+      }
 
       if (pid) {
         execSync(`kill -9 ${pid}`);
         console.warn(
-          `${symbols.warn} Force-killed orphan process using port ${app.port} (PID ${pid})`
+          `${symbols.warn} Force-killed PID ${pid} using port ${app.port}`
         );
         killed = true;
+      } else {
+        console.warn(`${symbols.warn} No PID found for port ${app.port}`);
       }
     } catch (err) {
-      console.warn(
-        `${symbols.warn} No PID found for port ${app.port} during stop`
+      console.error(
+        `${symbols.error} Failed to force-kill app "${name}": ${err.message}`
       );
     }
   }
 
+  // Clear app state
   app.running = false;
   app.process = null;
-  app.pid = null; // ✅ Optional: only needed if you persist pid
+  app.pid = null;
   saveAppRegistry();
 
   if (killed) {
-    return res.json({
-      success: true,
-      message: `Stopped "${req.params.name}"`,
-    });
+    return res.json({ success: true, message: `Stopped "${name}"` });
   } else {
-    return res.json({
-      success: false,
-      message: `"${req.params.name}" was not running.`,
-    });
+    return res.json({ success: false, message: `"${name}" was not running.` });
   }
 });
 
